@@ -170,7 +170,7 @@ El cliente web se comunica con el backend en Go a través de una conexión WebSo
 
 ### 4.2 Diagrama de Contexto — C4 Nivel 1
 
-![Diagrama de Contexto C4 Nivel 1](./diagramas/c4-contexto.png)
+![Diagrama de Contexto C4 Nivel 1](./c4-contexto.png)
 
 A nivel de contexto, el sistema se modela como una única caja que interactúa con los usuarios finales mediante eventos en tiempo real sobre WebSocket. Redis no se representa en este nivel por ser un detalle interno de infraestructura; aparecerá en el Diagrama de Contenedores (Nivel 2).
 
