@@ -7,8 +7,10 @@ Hexagonal, debe poder probarse y entenderse sin levantar infraestructura.
 ## Contenido
 
 ```
-contexto-hexagonal/
+Proyecto-hexagonal/
+├── backend/
 ├── go.mod
+├── README.md
 └── internal/
     ├── domain/
     │   ├── entities.go        # Room, Participant, Event + validaciones
