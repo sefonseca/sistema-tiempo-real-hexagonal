@@ -160,19 +160,25 @@ A continuación se desarrolla la primera de las cuatro matrices solicitadas. Las
 
 ## 4. Diseño: Ejemplo Práctico y Funcional (primer avance)
 
-Se presenta el Diagrama de Alto Nivel (HLD) y el Diagrama de Contexto (C4 Nivel 1). El Diagrama de Contenedores (Nivel 2), el Diagrama Dinámico y el Diagrama de Despliegue se construyen sobre esta misma base en la siguiente etapa del diseño.
+Se presentan el Diagrama de Alto Nivel (HLD), el Diagrama de Contexto (C4 Nivel 1) y el Diagrama de Componentes (C4 Nivel 3), que es el nivel normativo de C4 para representar la Arquitectura Hexagonal. El Diagrama de Contenedores (Nivel 2), el Diagrama Dinámico y el Diagrama de Despliegue se construyen sobre esta misma base.
 
 ### 4.1 Diagrama de Alto Nivel (HLD)
 
 ![Diagrama de Alto Nivel](./diagramas/hld.png)
 
-El cliente web se comunica con el backend en Go a través de una conexión WebSocket persistente. El backend, organizado según Ports & Adapters, delega la persistencia y la difusión de eventos en tiempo real a Redis (almacenamiento clave-valor y canal Pub/Sub).
+El usuario accede al cliente web (capa de presentación), que se comunica con el backend en Go (capa de negocio) mediante WebSocket. El backend delega la persistencia y la difusión de eventos a Redis (capa de datos). Cada color identifica una capa y cada flecha indica el protocolo y el sentido de la comunicación.
 
 ### 4.2 Diagrama de Contexto — C4 Nivel 1
 
 ![Diagrama de Contexto C4 Nivel 1](./c4/c4-contexto.png)
 
-A nivel de contexto, el sistema se modela como una única caja que interactúa con los usuarios finales mediante eventos en tiempo real sobre WebSocket. Redis no se representa en este nivel por ser un detalle interno de infraestructura; aparecerá en el Diagrama de Contenedores (Nivel 2).
+A nivel de contexto, el sistema se modela como una única caja ([Software System]) que interactúa con las personas ([Person]). Siguiendo la norma de C4, este nivel es agnóstico a la tecnología: no muestra Go, Redis ni la arquitectura interna, que aparecen en los niveles 2 y 3.
+
+### 4.3 Diagrama de Componentes — C4 Nivel 3 (Arquitectura Hexagonal)
+
+![Diagrama de Componentes C4 Nivel 3](./c4/c4-componentes.png)
+
+La Arquitectura Hexagonal se modela en el Nivel 3, descomponiendo el contenedor Backend Go en tres zonas: adaptadores de entrada (WebSocketHandler), núcleo (EventService y los puertos de salida) y adaptadores de salida (RedisRepositories y RedisBroadcaster). Las flechas "Implementa" apuntan hacia el puerto, respetando la inversión de dependencias: la infraestructura depende del dominio, nunca al revés. Las entidades del dominio no se dibujan individualmente para no saturar el diagrama.
 
 ---
 
@@ -273,3 +279,4 @@ Con esto quedan definidas las 3 entidades de negocio interrelacionadas (`Room`, 
 - Cockburn, A. — "Hexagonal Architecture" (artículo original, alistair.cockburn.us).
 - Documentación oficial: react.dev, vitejs.dev, typescriptlang.org, go.dev, redis.io, RFC 6455 (WebSocket).
 - Martin, R. C. — *Clean Architecture* (2017), para contraste con el estilo de círculos concéntricos.
+
