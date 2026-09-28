@@ -156,6 +156,38 @@ A continuación se desarrolla la primera de las cuatro matrices solicitadas. Las
 | Seguridad | Concentrar la autenticación/autorización en los adaptadores de entrada permite auditar un único punto de control antes de llegar al dominio. | El dominio no debe asumir que todo mensaje que recibe ya fue validado; si el adaptador falla en validar, el riesgo se traslada. |
 | Despliegue (Deployability) | Backend y frontend son desplegables por separado, y el backend puede publicarse como un único binario en un contenedor liviano. | Aumenta el número de piezas a orquestar (contenedor de backend, de Redis, de frontend) frente a un monolito sin capas. |
 
+### 3.4 Matriz de mercado laboral vs. estilo y stack
+
+#### Demanda y adopción
+
+| Elemento | Indicador | Fuente |
+|---|---|---|
+| React | 85 % de uso, satisfacción 72 % | State of JS 2025 |
+| TypeScript | Lenguaje en expansión junto con Go y Rust, según el análisis de la encuesta | Stack Overflow Developer Survey 2025 |
+| Go | Lenguaje admirado y de buena remuneración; posición 13 con 1,20 % en el índice TIOBE de junio de 2026 (−1,08 puntos interanual). Dato de segunda mano: confirmar en tiobe.com. | Stack Overflow 2025 (vía KORE1); TIOBE |
+| Redis | +8 puntos de uso en 2025; quinta base de datos más usada | Stack Overflow Developer Survey 2025 |
+| Arquitectura Hexagonal | No es una tecnología con estadísticas propias: se valora como competencia de diseño (Clean Architecture, DDD, microservicios) que aparece en ofertas de nivel semi-senior y senior. No se encontraron cifras específicas del estilo. | --- |
+| WebSocket | Competencia transversal (tiempo real); sin estadísticas propias. | --- |
+
+#### Salarios de referencia: desarrollador backend en Colombia (2026)
+
+| Nivel | Salario mensual (COP) | Equivalentes aprox. (USD) | Fuente |
+|---|---|---|---|
+| Junior | 4.200.000 – 5.200.000 | 1.100 – 1.350 | Coderhouse, Sueldo Backend Colombia 2026 |
+| Semi senior | 6.000.000 – 8.500.000 | 1.600 – 2.250 | Coderhouse |
+| Senior | 10.000.000 o más (más variable) | 2.650 o más | Coderhouse |
+| Promedio publicado | 4.525.953 por mes (13 sueldos reportados, feb. 2026) | --- | Indeed Colombia |
+| Junior/Senior (contratos en dolares) | --- | 1.155 promedio junior; hasta 6.000 senior | Talently 2026 |
+| Medellin (Glassdoor) | Promedio de 5.858.681 al año según el portal; rango típico 4.105.692 – 8.958.333  | --- | Glassdoor |
+
+#### Salarios de referencia en Estados Unidos (2025) 
+
+| Rol | Mediana anual (USD) | Fuente |
+|---|---|---|
+| Desarrollador backend | 175.000 | Stack Overflow Developer Survey 2025 |
+| Desarrollador full-stack | 138.000 | Stack Overflow Developer Survey 2025 |
+| Ingeniero de software (compensacion total) | 192.500 | Levels.fyi 2025 |
+
 ---
 
 ## 4. Diseño: Ejemplo Práctico y Funcional (primer avance)
