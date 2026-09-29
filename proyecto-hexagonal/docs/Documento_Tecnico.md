@@ -391,14 +391,6 @@ Verificado durante el desarrollo: go vet, go test \-race con Redis real, npm run
 
 * Persistir los participantes y agregar métricas y trazas (observabilidad).
 
-**Trabajo en equipo (completar entre los tres antes de la sustentación)**
-
-* ¿Cómo repartimos el trabajo y qué funcionó?
-
-* ¿Qué conflictos de Git tuvimos y cómo los resolvimos?
-
-* ¿Qué parte nos costó más y por qué?
-
 ---
 
 ## **7\. Fuentes**
