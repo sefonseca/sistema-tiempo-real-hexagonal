@@ -11,7 +11,7 @@ Caso de uso de extremo a extremo: `crear sala → unirse → publicar evento →
 - **Estilo arquitectónico:** Arquitectura Hexagonal (Ports & Adapters)
 - **Entidades de negocio:** `Room` 1—N `Participant`, `Room` 1—N `Event`
 
-![Diagrama de componentes](docs/diagramas/c4-componentes.png)
+![Diagrama de componentes](docs/c4/c4-componentes.png)
 
 ## Tecnologías usadas
 
@@ -121,6 +121,6 @@ docker-compose.yml
 
 ## Autores
 
-Sebastian Fonseca
-Damian Rey
-Samuel Tovar
+### Sebastian Fonseca
+### Damian Rey
+### Samuel Tovar
