@@ -1,11 +1,9 @@
-[investigacion.md](https://github.com/user-attachments/files/32448733/investigacion.md)
-
 # Arquitectura Hexagonal (Ports & Adapters)
 
 **Stack:** Vite + React + TypeScript · Go (Golang) · Redis · WebSocket
 
 Documento técnico — Presentación 1: Exploración de Estilos Arquitectónicos y Stack Tecnológico
-*Avance 1: Investigación, primer avance de análisis, diseño e implementación*
+*Entrega final: investigación, análisis arquitectónico, diseño, implementación y lecciones aprendidas*
 
 ---
 
@@ -48,6 +46,18 @@ Propuesta por Alistair Cockburn en 2005 bajo el nombre "Ports and Adapters", com
 - **Puertos mal diseñados (demasiado amplios):** un puerto que expone detalles técnicos (ej. paginación con cursores propios de Redis) rompe la abstracción; se corrige aplicando Interface Segregation.
 - **Patrones que suele necesitar este estilo:** Dependency Injection (para inyectar adaptadores en tiempo de arranque), Repository (puerto de salida hacia persistencia), Adapter (patrón GoF, base conceptual del estilo), Facade (para exponer casos de uso del dominio a los adaptadores de entrada) y, en este proyecto, Observer/Publish-Subscribe para el canal de WebSocket.
 
+**Patrones aplicables y cuándo usarlos**
+
+| Patrón | Cuándo usarlo | Dónde se usa en este proyecto |
+|---|---|---|
+| Ports & Adapters (Adapter) | Cuando el dominio debe comunicarse con tecnologías intercambiables | Todo el backend: `ports/` define los contratos y `adapters/` los implementa |
+| Dependency Injection | Cuando un componente necesita colaboradores que pueden cambiar (o simularse en pruebas) | `NewEventService(rooms, events, notify, newID)` y el ensamblado en `main.go` |
+| Repository | Cuando se quiere ocultar cómo y dónde se persisten los datos | `RoomRepository` y `EventRepository`, implementados con Redis |
+| Facade / Application Service | Cuando varios adaptadores necesitan un único punto de entrada a los casos de uso | `EventService` (puerto de entrada) |
+| Publish–Subscribe | Cuando un evento debe llegar a varios receptores sin acoplarlos | `EventBroadcaster` y `EventSubscriber` sobre Redis Pub/Sub |
+| DTO / Mapper | Cuando el formato externo (JSON) no debe condicionar el modelo interno | `protocol.go` en el adaptador WebSocket |
+| Factory (constructores con validación) | Cuando un objeto solo debe existir en estado válido | `NewRoom`, `NewParticipant`, `NewEvent` |
+
 ### 1.7 Casos de uso
 
 **Cuándo usarlo:** cuando la lógica de negocio es valiosa y debe sobrevivir a cambios tecnológicos; cuando se prevén múltiples canales de entrada (API REST + WebSocket + CLI) o múltiples proveedores de persistencia; cuando se requiere probar el dominio de forma aislada y rápida.
@@ -56,9 +66,9 @@ Propuesta por Alistair Cockburn en 2005 bajo el nombre "Ports and Adapters", com
 
 ### 1.8 Casos de aplicación reales
 
-- Netflix y otras plataformas de streaming aíslan su lógica de recomendación/negocio de los adaptadores hacia distintos proveedores de datos y colas de eventos.
-- Equipos que migran de monolito a microservicios suelen introducir Hexagonal primero dentro del monolito (Strangler Fig) para poder extraer servicios sin reescribir el dominio.
-- Es el estilo recomendado por la comunidad de Go (proyectos como "go-kit" y ejemplos oficiales de Domain-Driven Design en Go) para separar handlers HTTP/WebSocket del núcleo de negocio.
+- **Netflix (Studio Engineering):** el equipo de Studio Workflows documentó en el Netflix Tech Blog ("Ready for changes with Hexagonal Architecture") cómo usó Arquitectura Hexagonal para construir una aplicación que debía integrarse con datos repartidos en servicios con distintos protocolos (gRPC, JSON API, GraphQL) y que cambiaban de lugar mientras se descomponía un monolito. Los adaptadores absorben esos cambios sin tocar el dominio.
+- **Migraciones de monolito a servicios:** el estilo se usa para aislar la lógica de negocio de los detalles de infraestructura y así poder mover una fuente de datos (de una base local a un servicio) cambiando solo un adaptador.
+- **Servicios en Go:** es habitual estructurar los proyectos con `cmd/` e `internal/`, separando el dominio de los adaptadores; es exactamente la organización de este proyecto.
 
 ---
 
@@ -90,7 +100,7 @@ Propuesta por Alistair Cockburn en 2005 bajo el nombre "Ports and Adapters", com
 
 **Casos de uso:** excelente para backends con alta concurrencia y comunicación en tiempo real como servidores WebSocket, proxies, APIs de baja latencia. Menos indicado cuando se requiere un ecosistema ORM/ADMIN muy maduro tipo Django o Rails para CRUDs administrativos complejos.
 
-**Casos de aplicación:** Docker, Kubernetes, Cloudflare, y buena parte de la infraestructura de mensajería en tiempo real de empresas como Uber y Twitch usan Go precisamente por su capacidad de sostener muchas conexiones WebSocket concurrentes.
+**Casos de aplicación:** Docker y Kubernetes están escritos en Go, lo que lo consolidó como lenguaje de la infraestructura cloud-native; por su modelo de concurrencia también es una elección frecuente para servidores con muchas conexiones simultáneas.
 
 ### 2.3 Persistencia — Redis (Clave-Valor)
 
@@ -104,7 +114,7 @@ Propuesta por Alistair Cockburn en 2005 bajo el nombre "Ports and Adapters", com
 
 **Casos de uso:** ideal como almacén principal de estado efímero/tiempo real (sesiones, presencia de usuarios, contadores, colas) y como canal Pub/Sub para difundir mensajes a través de WebSocket. No es la mejor opción como única fuente de verdad para datos transaccionales complejos con integridad referencial estricta.
 
-**Casos de aplicación:** Twitter (líneas de tiempo y contadores), Stack Overflow (caché), y de forma muy común como backend de mensajería para aplicaciones de chat y notificaciones en tiempo real similares a la de este proyecto.
+**Casos de aplicación:** caché, gestión de sesiones, colas ligeras, contadores y difusión de mensajes en tiempo real. La Stack Overflow Developer Survey 2025 lo ubica como la quinta base de datos más usada y con un crecimiento de 8 puntos frente al año anterior.
 
 ### 2.4 Protocolo de Integración — WebSocket
 
@@ -118,7 +128,7 @@ Propuesta por Alistair Cockburn en 2005 bajo el nombre "Ports and Adapters", com
 
 **Casos de uso:** aplicaciones que requieren actualizaciones en tiempo real en ambas direcciones: chats, juegos, dashboards colaborativos, notificaciones. No es la opción adecuada para operaciones puntuales tipo petición-respuesta donde REST es más simple y cacheable.
 
-**Casos de aplicación:** Slack, Discord y aplicaciones de trading en tiempo real usan WebSocket (o variantes propias sobre el mismo protocolo) para sincronizar estado entre múltiples clientes de forma instantánea.
+**Casos de aplicación:** aplicaciones de mensajería y colaboración en tiempo real (por ejemplo chats, tableros compartidos y paneles en vivo) usan WebSocket para sincronizar el estado entre clientes de forma instantánea.
 
 ### 2.5 Relación entre el estilo y las tecnologías seleccionadas
 
@@ -136,63 +146,109 @@ En otras palabras: el protocolo de integración (WebSocket) y la base de datos (
 
 ### 2.6 Qué tan común es este stack
 
-Go como backend para servidores WebSocket de alta concurrencia es una combinación muy establecida en la industria (usada en infraestructura de mensajería y gaming en tiempo real) gracias al modelo de goroutines. Redis como almacén Pub/Sub detrás de WebSocket es igualmente una combinación de referencia, documentada como patrón estándar para escalar servidores de tiempo real horizontalmente (varias instancias del backend comparten estado/eventos a través de Redis). React + TypeScript es, según los reportes anuales de la industria, la combinación de frontend más usada en aplicaciones SPA modernas. La combinación completa (React/TS + Go + Redis + WebSocket) es menos frecuente como "paquete cerrado" que, por ejemplo, MERN o un stack Next.js + Postgres, pero cada par de tecnologías dentro de ella es individualmente muy común; esto se documentará con cifras concretas de encuestas (Stack Overflow Developer Survey, JetBrains State of Developer Ecosystem, GitHub Octoverse) en la matriz de mercado laboral, dentro del análisis arquitectónico.
+Cada tecnología por separado es muy común; lo menos frecuente es la combinación exacta:
 
----
+| Tecnología | Evidencia de adopción | Fuente |
+|---|---|---|
+| React | 85 % de uso entre los encuestados de State of JS 2025 (satisfacción 72 %); primera librería de frontend en las encuestas recientes | State of JS 2025 |
+| Redis | Quinta base de datos más usada; +8 puntos de uso en 2025 | Stack Overflow Developer Survey 2025 |
+| Go | Lenguaje consolidado en infraestructura y servicios; aparece entre los más admirados en la encuesta de 2025 | Stack Overflow Developer Survey 2025 (según el resumen de KORE1) |
+| WebSocket | Estándar del IETF (RFC 6455) soportado por todos los navegadores | RFC 6455 |
 
-## 3. Análisis Arquitectónico (primer avance)
+La combinación React/TS + Go + Redis + WebSocket es menos frecuente como "paquete cerrado" que MERN o Next.js + PostgreSQL, pero es un stack coherente para tiempo real: Go sostiene muchas conexiones concurrentes, Redis aporta persistencia rápida y Pub/Sub, y WebSocket entrega los eventos al navegador. La comparación de demanda laboral y salarios se detalla en la matriz 3.4.
 
-A continuación se desarrolla la primera de las cuatro matrices solicitadas. Las tres restantes (principios, tácticas/ADR y mercado laboral) se completarán a partir de esta misma base conceptual.
+## 3. Análisis Arquitectónico
+
+Se presentan las cuatro matrices solicitadas. Las matrices 3.1 a 3.3 se contrastan con el código real del proyecto (carpeta `backend/`); la matriz 3.4 usa fuentes públicas citadas al final.
 
 ### 3.1 Matriz de atributos de calidad vs. estilo
 
-| Atributo de calidad | Cómo lo soporta Hexagonal | Cómo lo limita / riesgo |
-|---|---|---|
-| Testeabilidad | El dominio se prueba de forma aislada sustituyendo los adaptadores por dobles de prueba de los puertos; no requiere levantar Redis ni un socket real. | Si un puerto se diseña mal (demasiado técnico), las pruebas del dominio terminan dependiendo indirectamente de infraestructura. |
-| Mantenibilidad / Modificabilidad | Cambiar Redis por otra base, o WebSocket por otro protocolo, solo implica escribir un nuevo adaptador; el dominio no se toca. | Más archivos e indirecciones que mantener; un equipo pequeño puede tardar más en ubicar dónde vive cada regla. |
-| Portabilidad | El núcleo de negocio no depende de ningún SDK ni framework, por lo que puede moverse a otro runtime o lenguaje con menor esfuerzo relativo. | La portabilidad real depende de que los adaptadores efectivamente encapsulen toda la dependencia externa; si se filtra, se pierde el beneficio. |
-| Escalabilidad | Al aislar el estado compartido en Redis (Pub/Sub), se pueden levantar varias instancias del backend en Go sin duplicar lógica de negocio. | El estilo por sí solo no resuelve escalabilidad; depende de que el adaptador de Redis se diseñe pensando en múltiples instancias. |
-| Rendimiento | Las interfaces (puertos) son livianas en Go (resueltas en tiempo de compilación), por lo que el costo de la indirección es mínimo frente al framework. | Cada llamada pasa por una capa adicional (adaptador → puerto → dominio) que, aunque barata, no es cero. |
-| Seguridad | Concentrar la autenticación/autorización en los adaptadores de entrada permite auditar un único punto de control antes de llegar al dominio. | El dominio no debe asumir que todo mensaje que recibe ya fue validado; si el adaptador falla en validar, el riesgo se traslada. |
-| Despliegue (Deployability) | Backend y frontend son desplegables por separado, y el backend puede publicarse como un único binario en un contenedor liviano. | Aumenta el número de piezas a orquestar (contenedor de backend, de Redis, de frontend) frente a un monolito sin capas. |
+| Atributo de calidad | Cómo lo soporta Hexagonal | Cómo lo limita / riesgo | Evidencia en el proyecto |
+|---|---|---|---|
+| Testeabilidad | El dominio se prueba sustituyendo los adaptadores por dobles de prueba de los puertos; no requiere Redis ni un socket real. | Si un puerto se diseña demasiado técnico, las pruebas dependen indirectamente de infraestructura. | `internal/app/event_service_test.go` prueba el flujo completo con fakes en memoria. |
+| Mantenibilidad / Modificabilidad | Cambiar Redis por otra base, o WebSocket por otro protocolo, solo implica un nuevo adaptador; el dominio no se toca. | Más archivos e indirecciones; en equipos pequeños cuesta ubicar dónde vive cada regla. | Las reglas de validación viven solo en `internal/domain/entities.go`. |
+| Portabilidad | El núcleo no depende de ningún SDK ni framework. | Se pierde si la infraestructura se filtra al dominio. | `domain/`, `ports/` y `app/` no importan `redis` ni `websocket`. |
+| Escalabilidad | Al pasar los eventos por Redis Pub/Sub, se pueden levantar varias instancias del backend sin duplicar lógica. | El estilo por sí solo no escala; depende de cómo se diseñe el adaptador de Redis. | El `Hub` recibe los eventos del puerto `EventSubscriber`, no de memoria local. |
+| Rendimiento | En Go las interfaces son baratas; el costo de la indirección es mínimo. | Cada llamada pasa por una capa adicional (adaptador → puerto → dominio). | Goroutines por conexión; pipeline de Redis (`TxPipeline`) para guardar en una sola ida y vuelta. |
+| Seguridad | La validación y los límites se concentran en los adaptadores de entrada y en el dominio. | El dominio no debe asumir que todo llegó validado. | Límite de mensaje (`SetReadLimit`), contenido máximo de 2000 caracteres, contenedor sin privilegios de root. |
+| Disponibilidad / Resiliencia | Si falla un adaptador, el dominio decide cómo degradar. | Requiere diseñar políticas de error explícitas. | Si falla la difusión el evento ya quedó guardado; el cliente reconecta con backoff exponencial. |
+| Despliegue (Deployability) | Backend y frontend se despliegan por separado; el backend es un único binario. | Más piezas que orquestar (backend, Redis, frontend). | `docker-compose.yml` levanta las 3 piezas con un comando. |
+
+### 3.2 Matriz de principios vs. estilo
+
+| Principio | Cómo lo cumple el estilo | Cómo se aplica en el proyecto | Valoración |
+|---|---|---|---|
+| **S** — Responsabilidad única | Cada zona tiene un solo motivo de cambio: el handler traduce, el servicio orquesta, las entidades validan, los repositorios persisten. | `handler.go` no contiene reglas de negocio; `entities.go` no conoce Redis. | Cumple |
+| **O** — Abierto/Cerrado | Se agregan adaptadores nuevos sin modificar el servicio. | Un repositorio PostgreSQL implementaría `RoomRepository` sin tocar `event_service.go`. | Cumple |
+| **L** — Sustitución de Liskov | Cualquier implementación de un puerto es intercambiable. | Los fakes de las pruebas y los adaptadores de Redis satisfacen las mismas interfaces. | Cumple |
+| **I** — Segregación de interfaces | Puertos pequeños y específicos. | Cuatro puertos de salida separados (`RoomRepository`, `EventRepository`, `EventBroadcaster`, `EventSubscriber`) en vez de uno grande. | Cumple |
+| **D** — Inversión de dependencias | Es el núcleo del estilo: la infraestructura depende del dominio. | `NewEventService` recibe interfaces; solo `main.go` conoce las implementaciones. | Cumple (principio central) |
+| **KISS** | El estilo agrega capas, lo que puede ir contra la simplicidad. | Se evitaron frameworks: solo dos dependencias externas en el backend (`gorilla/websocket`, `go-redis`). | Cumple con matices |
+| **DRY** | La validación se define una vez en el dominio y sirve para cualquier canal de entrada. | Los DTOs del adaptador repiten campos de las entidades (duplicación deliberada para no acoplar el dominio al formato JSON). | Cumple con matices |
+| **YAGNI** | El estilo invita a diseñar puertos "por si acaso", lo que puede sobredimensionar. | No se implementó autenticación, CQRS ni persistencia de participantes: no lo exige el caso de uso. | Cumple |
+| **PoLA** (mínima sorpresa) | Los puertos hacen explícito el contrato. | Los errores de negocio llegan al cliente como mensajes legibles; los errores de infraestructura no exponen detalles internos. | Cumple |
+| **Ley de Demeter** | El adaptador de entrada solo habla con el puerto, no con repositorios. | `handler.go` llama únicamente a `ports.EventService`. | Cumple |
+| **STUPID** (anti-principios) | Evita Singleton, acoplamiento fuerte, no testeabilidad, optimización prematura, nombres poco descriptivos y duplicación. | Sin variables globales (la inyección se hace en `main.go`); cada pieza es testeable; no hay optimizaciones prematuras. | Se evita (ver detalle abajo) |
+| **Composición sobre herencia** | Los componentes se ensamblan por interfaces. | Go no tiene herencia: `eventService` se compone de tres puertos inyectados. | Cumple |
+
+Detalle de STUPID: **S**ingleton (no hay estado global), **T**ight coupling (dependencias por interfaz), **U**ntestability (18 pruebas automáticas), **P**remature optimization (ninguna), **I**ndescriptive naming (nombres de dominio en español/inglés consistentes con el negocio), **D**uplication (validación centralizada; la única duplicación son los DTOs, justificada arriba).
+
+### 3.3 Matriz de tácticas vs. estilo y stack (justificación de ADR)
+
+Las tácticas siguen el catálogo de atributos de calidad de Bass, Clements y Kazman. Cada fila justifica un ADR (Architecture Decision Record) completo en `docs/adr/`.
+
+| Atributo | Táctica | Justificación por el estilo | Justificación por el stack | Alternativa descartada | ADR |
+|---|---|---|---|---|---|
+| Modificabilidad | Intermediario (puertos y adaptadores) | Es la esencia de Hexagonal: aísla el dominio de la infraestructura. | Las interfaces de Go se satisfacen implícitamente, sin declarar "implements". | Arquitectura en capas con el dominio dependiendo del acceso a datos. | ADR-001 |
+| Rendimiento | Concurrencia | El adaptador de entrada puede atender muchas conexiones sin afectar el dominio. | Goroutines ligeras: una por conexión. | Hilos del sistema por conexión (más memoria). | ADR-002 |
+| Rendimiento / Persistencia | Mantener datos en memoria + estructuras adecuadas | El repositorio es un puerto: la tecnología es intercambiable. | Redis ofrece LIST, ZSET y Pub/Sub nativos. | PostgreSQL (más pesado para este caso de eventos efímeros). | ADR-003 |
+| Interoperabilidad / Latencia | Canal bidireccional persistente | El protocolo es un adaptador, no una decisión del dominio. | WebSocket es nativo en el navegador y en `gorilla/websocket`. | REST con polling (más latencia y tráfico). | ADR-004 |
+| Escalabilidad | Bus de eventos compartido | El puerto `EventBroadcaster` permite reemplazar la difusión local por una compartida. | Redis Pub/Sub entrega el evento a todas las instancias. | Difusión solo en memoria (no escala horizontalmente). | ADR-005 |
+| Seguridad / Modificabilidad | Encapsular y validar entradas | Las entidades de dominio no se exponen al exterior. | DTOs propios del adaptador WebSocket con etiquetas JSON. | Serializar directamente las entidades. | ADR-006 |
+| Despliegue | Contenerización | Cada adaptador se ensambla en `main.go`, listo para empaquetar. | Go compila a un binario estático: imagen final mínima. | Despliegue manual sin contenedores. | (en 5.4) |
+| Disponibilidad | Reintento y monitoreo | El dominio no conoce las fallas de red; los adaptadores las gestionan. | Reconexión con backoff en el cliente; `/healthz` y healthcheck de Docker. | Sin reconexión automática. | (en 5.4) |
 
 ### 3.4 Matriz de mercado laboral vs. estilo y stack
 
-#### Demanda y adopción
+**Cómo leerla:** los datos provienen de fuentes públicas consultadas en septiembre de 2026 y son referenciales. Los salarios cambian por empresa, ciudad y experiencia; verifiquen las cifras en las fuentes antes de la sustentación.
+
+**Demanda y adopción**
 
 | Elemento | Indicador | Fuente |
 |---|---|---|
 | React | 85 % de uso, satisfacción 72 % | State of JS 2025 |
 | TypeScript | Lenguaje en expansión junto con Go y Rust, según el análisis de la encuesta | Stack Overflow Developer Survey 2025 |
-| Go | Lenguaje admirado y de buena remuneración; posición 13 con 1,20 % en el índice TIOBE de junio de 2026 (−1,08 puntos interanual). Dato de segunda mano: confirmar en tiobe.com. | Stack Overflow 2025 (vía KORE1); TIOBE |
+| Go | Lenguaje admirado y de buena remuneración; posición 13 con 1,20 % en el índice TIOBE de junio de 2026 (−1,08 puntos interanual). *Dato de segunda mano: confirmar en tiobe.com.* | Stack Overflow 2025 (vía KORE1); TIOBE |
 | Redis | +8 puntos de uso en 2025; quinta base de datos más usada | Stack Overflow Developer Survey 2025 |
-| Arquitectura Hexagonal | No es una tecnología con estadísticas propias: se valora como competencia de diseño (Clean Architecture, DDD, microservicios) que aparece en ofertas de nivel semi-senior y senior. No se encontraron cifras específicas del estilo. | --- |
-| WebSocket | Competencia transversal (tiempo real); sin estadísticas propias. | --- |
+| Arquitectura Hexagonal | No es una tecnología con estadísticas propias: se valora como competencia de diseño (Clean Architecture, DDD, microservicios) que aparece en ofertas de nivel semi-senior y senior. *No se encontraron cifras específicas del estilo.* | — |
+| WebSocket | Competencia transversal (tiempo real); sin estadísticas propias | — |
 
-#### Salarios de referencia: desarrollador backend en Colombia (2026)
+**Salarios de referencia: desarrollador backend en Colombia (2026)**
 
-| Nivel | Salario mensual (COP) | Equivalentes aprox. (USD) | Fuente |
+| Nivel | Salario mensual (COP) | Equivalente aprox. (USD) | Fuente |
 |---|---|---|---|
 | Junior | 4.200.000 – 5.200.000 | 1.100 – 1.350 | Coderhouse, Sueldo Backend Colombia 2026 |
 | Semi senior | 6.000.000 – 8.500.000 | 1.600 – 2.250 | Coderhouse |
 | Senior | 10.000.000 o más (más variable) | 2.650 o más | Coderhouse |
-| Promedio publicado | 4.525.953 por mes (13 sueldos reportados, feb. 2026) | --- | Indeed Colombia |
-| Junior/Senior (contratos en dolares) | --- | 1.155 promedio junior; hasta 6.000 senior | Talently 2026 |
-| Medellin (Glassdoor) | Promedio de 5.858.681 al año según el portal; rango típico 4.105.692 – 8.958.333  | --- | Glassdoor |
+| Promedio publicado | 4.525.953 por mes (13 sueldos reportados, feb. 2026) | — | Indeed Colombia |
+| Junior / Senior (contratos en dólares) | — | 1.155 promedio junior; hasta 6.000 senior | Talently 2026 |
+| Medellín (Glassdoor) | Promedio de 5.858.681 al año según el portal; rango típico 4.105.692 – 8.958.333 | — | Glassdoor. *Las cifras del portal parecen mensuales pese a la etiqueta anual: interpretarlas con cautela.* |
 
-#### Salarios de referencia en Estados Unidos (2025) 
+**Salarios de referencia en Estados Unidos (2025)**
 
 | Rol | Mediana anual (USD) | Fuente |
 |---|---|---|
-| Desarrollador backend | 175.000 | Stack Overflow Developer Survey 2025 |
+| Desarrollador backend | 175.000 | Stack Overflow Developer Survey 2025 (EE. UU., 5.239 respuestas) |
 | Desarrollador full-stack | 138.000 | Stack Overflow Developer Survey 2025 |
-| Ingeniero de software (compensacion total) | 192.500 | Levels.fyi 2025 |
+| Ingeniero de software (compensación total) | 192.500 | Levels.fyi 2025 |
+
+**Proyección.** Redis sube en adopción; Go y TypeScript siguen creciendo en la encuesta de 2025, aunque Go pierde posición relativa en TIOBE frente a Rust (dato por confirmar). Las bandas mejoran cuando el candidato domina inglés y trabaja para clientes en dólares (nearshoring), y los salarios más altos se concentran en Bogotá y Medellín. Conclusión: es un stack empleable, con demanda sólida en React/TypeScript y Redis, y con Go como diferenciador de nicho en backend e infraestructura.
 
 ---
 
-## 4. Diseño: Ejemplo Práctico y Funcional (primer avance)
+## 4. Diseño: Ejemplo Práctico y Funcional
 
-Se presentan el Diagrama de Alto Nivel (HLD), el Diagrama de Contexto (C4 Nivel 1) y el Diagrama de Componentes (C4 Nivel 3), que es el nivel normativo de C4 para representar la Arquitectura Hexagonal. El Diagrama de Contenedores (Nivel 2), el Diagrama Dinámico y el Diagrama de Despliegue se construyen sobre esta misma base.
+El sistema se modeló con HLD y C4 Model. Todos los diagramas obligatorios están incluidos, además del diagrama de componentes y el modelo de datos (opcionales). Los archivos están en `docs/diagramas/`.
 
 ### 4.1 Diagrama de Alto Nivel (HLD)
 
@@ -202,113 +258,148 @@ El usuario accede al cliente web (capa de presentación), que se comunica con el
 
 ### 4.2 Diagrama de Contexto — C4 Nivel 1
 
-![Diagrama de Contexto C4 Nivel 1](./c4/c4-contexto.png)
+![Diagrama de Contexto C4 Nivel 1](./diagramas/c4-contexto.png)
 
-A nivel de contexto, el sistema se modela como una única caja ([Software System]) que interactúa con las personas ([Person]). Siguiendo la norma de C4, este nivel es agnóstico a la tecnología: no muestra Go, Redis ni la arquitectura interna, que aparecen en los niveles 2 y 3.
+El sistema se modela como una única caja `[Software System]` que interactúa con personas `[Person]`. Siguiendo la norma de C4, este nivel no muestra tecnología: Go, Redis y la arquitectura interna aparecen en los niveles 2 y 3.
 
-### 4.3 Diagrama de Componentes — C4 Nivel 3 (Arquitectura Hexagonal)
+### 4.3 Diagrama de Contenedores — C4 Nivel 2
 
-![Diagrama de Componentes C4 Nivel 3](./c4/c4-componentes.png)
+![Diagrama de Contenedores C4 Nivel 2](./diagramas/c4-contenedores.png)
 
-La Arquitectura Hexagonal se modela en el Nivel 3, descomponiendo el contenedor Backend Go en tres zonas: adaptadores de entrada (WebSocketHandler), núcleo (EventService y los puertos de salida) y adaptadores de salida (RedisRepositories y RedisBroadcaster). Las flechas "Implementa" apuntan hacia el puerto, respetando la inversión de dependencias: la infraestructura depende del dominio, nunca al revés. Las entidades del dominio no se dibujan individualmente para no saturar el diagrama.
+El sistema se descompone en cuatro contenedores: el servidor web (nginx) que entrega los archivos estáticos, la aplicación web (React), el backend API (Go) y Redis. Cada relación indica su protocolo entre corchetes.
+
+### 4.4 Diagrama de Componentes — C4 Nivel 3 (Arquitectura Hexagonal)
+
+![Diagrama de Componentes C4 Nivel 3](./diagramas/c4-componentes.png)
+
+La Arquitectura Hexagonal se modela en el Nivel 3, que es el nivel normativo de C4 para este estilo. El contenedor Backend API se divide en adaptadores de entrada (`WebSocket Handler`, `Hub`), núcleo (`EventService` y puertos de salida) y adaptadores de salida (`Redis Store`, `Redis PubSub`). Las flechas naranjas apuntan hacia el puerto: la infraestructura depende del dominio, nunca al revés.
+
+### 4.5 Diagrama Dinámico (flujo principal)
+
+![Diagrama Dinámico](./diagramas/c4-dinamico.png)
+
+Flujo principal: publicar un evento. El usuario envía el mensaje, el backend valida y guarda el evento en Redis, lo publica por Pub/Sub, y el `Hub` lo reenvía por WebSocket a todos los clientes de la sala, incluido el autor.
+
+### 4.6 Diagrama de Despliegue
+
+![Diagrama de Despliegue](./diagramas/c4-despliegue.png)
+
+Tres contenedores en una red de Docker Compose: `frontend` (nginx, puerto publicado 5173), `backend` (puerto publicado 8080) y `redis` (puerto interno 6379, con volumen `redis-data` para persistir). El navegador carga la SPA por HTTP y abre el WebSocket directamente contra el backend.
+
+### 4.7 Modelo de datos
+
+![Modelo de datos](./diagramas/modelo-datos.png)
+
+Tres entidades interrelacionadas: `Room` (1) — (N) `Participant` y `Room` (1) — (N) `Event`. `Room` y `Event` se persisten en Redis; `Participant` es efímero y vive solo en la memoria del `Hub`. Como Redis no tiene integridad referencial, el servicio de aplicación verifica que la sala exista antes de aceptar un evento.
 
 ---
 
-## 5. Implementación: Ejemplo Práctico y Funcional (primer avance)
+## 5. Implementación: Ejemplo Práctico y Funcional
 
-Se deja creada la estructura base del repositorio, respetando Ports & Adapters, y un primer esqueleto del núcleo de dominio en Go (entidades y puertos), sobre el cual se construyen los adaptadores y el resto del flujo end-to-end.
+### 5.1 Qué hace el sistema
 
-### 5.1 Estructura de carpetas del repositorio
+Un sistema de **salas en tiempo real**: los usuarios crean o se unen a una sala y todo mensaje publicado llega al instante a todos los conectados a esa sala. El historial se guarda en Redis, así que un usuario que entra después ve los mensajes anteriores.
+
+Caso de uso de extremo a extremo: `crear sala → unirse → publicar evento → difusión en tiempo real → consultar historial`.
+
+### 5.2 Estructura del repositorio
 
 ```
 proyecto-hexagonal/
-├── backend/                       # Go
-│   ├── cmd/server/main.go         # punto de entrada, arranque e inyección de dependencias
+├── backend/                         # Go 1.22
+│   ├── cmd/server/main.go           # raíz de composición (inyección de dependencias)
 │   ├── internal/
-│   │   ├── domain/                # entidades + reglas de negocio (sin dependencias externas)
-│   │   ├── ports/                 # interfaces: entrada (casos de uso) y salida (repo, notificador)
-│   │   └── adapters/
-│   │       ├── in/websocket/      # handler que traduce mensajes WS -> casos de uso
-│   │       └── out/redis/         # implementación de los puertos de salida usando Redis
-│   ├── go.mod
+│   │   ├── domain/                  # entidades + validaciones (sin dependencias externas)
+│   │   ├── ports/                   # interfaces de entrada y de salida
+│   │   ├── app/                     # servicio de aplicación (implementa el puerto de entrada)
+│   │   ├── adapters/
+│   │   │   ├── in/websocket/        # adaptador de entrada: handler, hub y DTOs
+│   │   │   └── out/redis/           # adaptadores de salida: repositorios y Pub/Sub
+│   │   ├── platform/id/             # generador de identificadores
+│   │   └── integration/             # prueba end-to-end con Redis real
+│   ├── Dockerfile
+│   └── go.mod
+├── frontend/                        # Vite + React + TypeScript
+│   ├── src/domain/                  # tipos, puerto RealtimeGateway y reductor de estado
+│   ├── src/adapters/                # cliente WebSocket (implementa el puerto)
+│   ├── src/components/              # Lobby y ChatRoom
 │   └── Dockerfile
-├── frontend/                      # Vite + React + TS
-│   ├── src/
-│   │   ├── domain/                # tipos y modelos de UI (independientes del transporte)
-│   │   ├── adapters/websocketClient.ts
-│   │   └── components/
-│   ├── package.json
-│   └── Dockerfile
-├── docs/
-│   ├── c4/                        # diagramas C4 (nivel 2, dinámico, despliegue)
-│   ├── diagramas/                 # hld.png, c4-contexto.png
-│   └── investigacion.md           # este documento
-├── docker-compose.yml             # backend + redis (+ frontend en dev)
+├── docs/                            # documento técnico, diagramas y ADRs
+├── docker-compose.yml               # Redis + backend + frontend
 └── README.md
 ```
 
-### 5.2 Esqueleto inicial del dominio (Go)
+### 5.3 Decisiones de implementación
 
-Como primer avance de código se definen las entidades de negocio y los puertos (interfaces), sin ninguna dependencia externa. Los adaptadores (WebSocket, Redis) se construyen luego contra estas mismas interfaces.
+- **Composición en un solo lugar:** `cmd/server/main.go` es el único archivo que conoce a la vez el dominio y los adaptadores concretos.
+- **Protocolo WebSocket (JSON):** mensajes del cliente `list_rooms`, `create_room`, `join`, `publish`; respuestas `rooms`, `room_created`, `joined`, `event`, `error`.
+- **Persistir antes de difundir:** el evento se guarda en Redis (`RPUSH`) y después se publica (`PUBLISH`). Si la difusión falla, el dato no se pierde.
+- **Robustez:** validaciones en el dominio (vacío, longitud máxima), límite de tamaño de mensaje, reconexión del cliente con backoff, reintentos del backend al arrancar hasta que Redis responda, y cierre ordenado del servidor.
+- **Frontend con el mismo estilo:** la interfaz depende del puerto `RealtimeGateway`; el cliente WebSocket es su adaptador.
 
-```go
-// internal/domain/entities.go
-package domain
+### 5.4 Contenedores
 
-// Entidad de negocio 1
-type Room struct {
-    ID        string
-    Name      string
-    CreatedAt time.Time
-}
+`docker-compose.yml` define tres servicios: `redis` (con persistencia AOF, volumen y healthcheck), `backend` (imagen multi-etapa, usuario sin privilegios, healthcheck contra `/healthz`, arranca solo cuando Redis está sano) y `frontend` (compilación con Vite y servido con nginx).
 
-// Entidad de negocio 2
-type Participant struct {
-    ID     string
-    RoomID string
-    Name   string
-}
+### 5.5 Pruebas y resultados
 
-// Entidad de negocio 3
-type Event struct {
-    ID        string
-    RoomID    string
-    Author    string
-    Payload   string
-    Timestamp time.Time
-}
-```
+| Nivel | Qué se prueba | Cantidad |
+|---|---|---|
+| Unitarias del dominio | Validaciones de entidades | 5 |
+| Unitarias de aplicación | Flujo completo con dobles de prueba en memoria, errores y fallo de difusión | 6 |
+| Integración (Redis real) | Dos clientes WebSocket reales: difusión en tiempo real, persistencia del historial, validaciones y salas inexistentes | 1 |
+| Frontend | Reductor de estado | 6 |
 
-```go
-// internal/ports/ports.go
-package ports
+Verificado durante el desarrollo: `go vet`, `go test -race` con Redis real, `npm run build` (TypeScript estricto) y `vitest`; además, el binario real (`cmd/server`) se probó con dos clientes WebSocket externos (difusión, historial, error por mensaje vacío y por sala inexistente). Las claves generadas en Redis (`hexagonal:rooms`, `hexagonal:room:{id}`, `hexagonal:room:{id}:events`) se comprobaron con `redis-cli`.
 
-import "contexto-hexagonal/internal/domain"
-
-// Puerto de entrada: lo implementa el dominio, lo invocan los adaptadores in/
-type EventService interface {
-    PublishEvent(roomID, author, payload string) (domain.Event, error)
-}
-
-// Puerto de salida: lo implementa un adaptador out/, lo consume el dominio
-type EventRepository interface {
-    Save(e domain.Event) error
-    ListByRoom(roomID string) ([]domain.Event, error)
-}
-
-// Puerto de salida para difusión en tiempo real (Redis Pub/Sub)
-type EventBroadcaster interface {
-    Broadcast(roomID string, e domain.Event) error
-}
-```
-
-Con esto quedan definidas las 3 entidades de negocio interrelacionadas (`Room`, `Participant`, `Event`) que pide la guía, y el contrato (puertos) que deben cumplir el adaptador de entrada en WebSocket, el adaptador de salida en Redis y el broadcaster de eventos. El código funcional completo (con validaciones, servicio de aplicación y pruebas unitarias) vive en `backend/internal/`.
+**Limitación honesta:** en el entorno donde se desarrolló no había Docker instalado, por lo que las imágenes y el `docker-compose.yml` no se construyeron allí; se validó la sintaxis del YAML y el backend se probó de forma nativa contra Redis. La primera ejecución de `docker compose up --build` la deben hacer y registrar ustedes (ver `README.md`).
 
 ---
 
-## 6. Fuentes
+## 6. Lecciones aprendidas
 
-- Cockburn, A. — "Hexagonal Architecture" (artículo original, alistair.cockburn.us).
-- Documentación oficial: react.dev, vitejs.dev, typescriptlang.org, go.dev, redis.io, RFC 6455 (WebSocket).
-- Martin, R. C. — *Clean Architecture* (2017), para contraste con el estilo de círculos concéntricos.
+**Técnicas (surgieron al construir el sistema)**
 
+1. **El estilo se paga y se cobra.** Hexagonal agregó archivos, puertos y DTOs, pero permitió escribir pruebas del flujo completo sin infraestructura y una prueba de integración con Redis real sin cambiar el dominio.
+2. **Go no tiene sobrecarga de métodos.** `RoomRepository.Save(Room)` y `EventRepository.Save(Event)` no podían vivir en el mismo tipo; se separaron en `Store` y `EventStore`. Los puertos condicionan el diseño de los adaptadores.
+3. **Pub/Sub no persiste.** Un mensaje publicado sin suscriptores se pierde. Por eso el historial se guarda aparte en una lista y solo la difusión en vivo usa Pub/Sub.
+4. **Un error sutil de Go:** pasar `rdb.Ping(ctx).Err` como función ejecuta el `Ping` una sola vez, por lo que el bucle de reintentos nunca reintentaba. Se corrigió pasando una función anónima. Las pruebas automáticas no lo habrían detectado; sí una revisión del código.
+5. **Concurrencia:** cerrar un canal mientras otra goroutine escribe provoca pánico. Se resolvió retirando al cliente del `Hub` (con candado) antes de cerrar su canal, y se verificó con `go test -race`.
+6. **`depends_on` no basta:** en Compose hay que esperar a que Redis esté *sano* (`condition: service_healthy`) y además reintentar la conexión en el backend.
+7. **Modelar en C4 obliga a separar niveles.** El contexto no debe mencionar tecnología, y la Arquitectura Hexagonal se muestra en el nivel de componentes, no en el de contenedores.
+
+**Qué haríamos distinto con más tiempo**
+
+- Usar **Redis Streams** en lugar de lista + Pub/Sub para tener reproducción y entrega al menos una vez.
+- Agregar **autenticación** y validar el `Origin` del WebSocket (hoy acepta cualquier origen, solo apto para entorno académico).
+- Persistir los participantes y agregar métricas y trazas (observabilidad).
+
+**Trabajo en equipo (completar entre los tres antes de la sustentación)**
+
+- ¿Cómo repartimos el trabajo y qué funcionó?
+- ¿Qué conflictos de Git tuvimos y cómo los resolvimos?
+- ¿Qué parte nos costó más y por qué?
+
+---
+
+## 7. Fuentes
+
+**Estilo y tecnologías**
+- Cockburn, A. — "Hexagonal Architecture" (alistair.cockburn.us).
+- Netflix Tech Blog — "Ready for changes with Hexagonal Architecture": https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749
+- Martin, R. C. — *Clean Architecture* (2017).
+- Documentación oficial: react.dev, vite.dev, typescriptlang.org, go.dev, redis.io; RFC 6455 (WebSocket).
+- Brown, S. — C4 Model: https://c4model.com
+- Bass, L., Clements, P., Kazman, R. — *Software Architecture in Practice* (catálogo de tácticas).
+- Nygard, M. — "Documenting Architecture Decisions" (formato de ADR).
+
+**Mercado laboral (consultadas en septiembre de 2026)**
+- Stack Overflow Developer Survey 2025: https://survey.stackoverflow.co/2025/technology y https://survey.stackoverflow.co/2025/work
+- State of JS 2025 (front-end frameworks): https://2025.stateofjs.com/en-US/libraries/front-end-frameworks/
+- KORE1 — Go Developer Salary Guide 2026: https://www.kore1.com/go-developer-salary-guide/
+- Coderhouse — Sueldo Desarrollador Backend en Colombia 2026: https://www.coderhouse.com/co/sueldos/sueldo-desarrollador-backend-colombia-2025
+- Indeed Colombia — Sueldo de Backend developer: https://co.indeed.com/career/backend-developer/salaries
+- Talently — Salarios de developers en Colombia 2026: https://talently.tech/herramientas/colombia/salario
+- Glassdoor — Backend Developer en Medellín: https://www.glassdoor.com/Salaries/medell%C3%ADn-colombia-backend-developer-salary-SRCH_IL.0,17_IM3063_KO18,35.htm
+- Levels.fyi — End of Year Pay Report 2025 (citado en la recopilación https://github.com/alihesari/awesome-high-paying-languages).
+- TIOBE Index (junio de 2026, dato tomado de una recopilación de terceros; confirmar en https://www.tiobe.com/tiobe-index/).

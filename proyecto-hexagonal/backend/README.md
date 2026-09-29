@@ -1,63 +1,35 @@
-# Núcleo hexagonal (dominio + puertos + servicio de aplicación)
-
-Este módulo corresponde a la capa central del hexágono: **no importa nada
-de Redis, WebSocket ni HTTP**. Es la parte que, según la Arquitectura
-Hexagonal, debe poder probarse y entenderse sin levantar infraestructura.
-
-## Contenido
+# Backend (Go) — Arquitectura Hexagonal
 
 ```
-Proyecto-hexagonal/
-├── backend/
-├── go.mod
-├── README.md
-└── internal/
-    ├── domain/
-    │   ├── entities.go        # Room, Participant, Event + validaciones
-    │   └── entities_test.go
-    ├── ports/
-    │   └── ports.go           # interfaces de entrada y de salida
-    └── app/
-        ├── event_service.go   # implementa el puerto de entrada (caso de uso)
-        └── event_service_test.go
+cmd/server/main.go            raíz de composición: conecta adaptadores con el dominio
+internal/domain/              entidades (Room, Participant, Event) y validaciones
+internal/ports/               interfaces: EventService (entrada);
+                              RoomRepository, EventRepository, EventBroadcaster, EventSubscriber (salida)
+internal/app/                 servicio de aplicación: implementa EventService
+internal/adapters/in/websocket/   adaptador de entrada: handler, hub y DTOs
+internal/adapters/out/redis/      adaptadores de salida: Store, EventStore, PubSub
+internal/platform/id/         generador de identificadores
+internal/integration/         prueba end-to-end con Redis real
 ```
 
-## Flujo principal implementado (end-to-end a nivel de dominio)
+**Regla de dependencia:** `domain`, `ports` y `app` no importan `redis` ni `websocket`. Los adaptadores dependen de los puertos, nunca al revés.
 
-`CreateRoom` → `Join` → `PublishEvent` (valida → persiste → difunde) → `History`
+## Variables de entorno
 
-`PublishEvent` es el caso de uso completo: valida que la sala exista,
-valida el contenido del evento con las reglas del dominio, lo guarda a
-través de `ports.EventRepository` y lo difunde a través de
-`ports.EventBroadcaster`. Si la difusión falla, el evento ya quedó
-guardado y el error se reporta sin perder el dato (ver
-`TestPublishEvent_EventoQuedaGuardadoAunqueFalleLaDifusion`).
+| Variable | Valor por defecto | Descripción |
+|---|---|---|
+| `PORT` | `8080` | Puerto HTTP/WebSocket |
+| `REDIS_ADDR` | `localhost:6379` | Dirección de Redis (en Compose: `redis:6379`) |
 
-## Cómo se conecta con el resto del proyecto
-
-Los adaptadores que faltan (handler de WebSocket como adaptador de
-entrada, y repositorio + Pub/Sub de Redis como adaptadores de salida)
-solo necesitan implementar las interfaces de `internal/ports/ports.go`
-e inyectarse en `app.NewEventService(...)`. El dominio y el servicio de
-aplicación no cambian.
-
-```go
-// Ejemplo de cómo se ensamblará en cmd/server/main.go (fuera de esta parte)
-svc := app.NewEventService(
-    redisRoomRepo,        // implementa ports.RoomRepository
-    redisEventRepo,       // implementa ports.EventRepository
-    redisPubSubBroadcaster, // implementa ports.EventBroadcaster
-    uuid.NewString,
-)
-```
-
-## Ejecutar
+## Comandos
 
 ```bash
-go build ./...
-go test ./... -v
+go run ./cmd/server                                   # ejecutar
+go test ./...                                         # pruebas unitarias
+REDIS_ADDR=localhost:6379 go test -race -count=1 ./...  # incluye integración con Redis
 ```
 
-Con Go instalado, ambos comandos corren sin ninguna dependencia externa
-(no requieren Docker ni Redis) — esa independencia es precisamente lo
-que se documentó en la matriz de "Testeabilidad" del análisis arquitectónico.
+## Endpoints
+
+- `GET /ws` — WebSocket (ver protocolo en el README de la raíz)
+- `GET /healthz` — responde `ok` si Redis está disponible

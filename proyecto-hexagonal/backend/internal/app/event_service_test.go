@@ -33,6 +33,16 @@ func (f *fakeRoomRepo) FindByID(id string) (domain.Room, bool, error) {
 	return r, ok, nil
 }
 
+func (f *fakeRoomRepo) List() ([]domain.Room, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]domain.Room, 0, len(f.rooms))
+	for _, r := range f.rooms {
+		out = append(out, r)
+	}
+	return out, nil
+}
+
 type fakeEventRepo struct {
 	mu     sync.Mutex
 	events map[string][]domain.Event
@@ -149,5 +159,19 @@ func TestJoin_RequiereSalaExistente(t *testing.T) {
 	_, err := svc.Join("p-1", "sala-fantasma", "ana")
 	if !errors.Is(err, domain.ErrRoomNotFound) {
 		t.Fatalf("se esperaba domain.ErrRoomNotFound, obtuvo: %v", err)
+	}
+}
+
+func TestListRooms_DevuelveSalasCreadas(t *testing.T) {
+	svc := NewEventService(newFakeRoomRepo(), newFakeEventRepo(), &fakeBroadcaster{}, idGen("x"))
+	_, _ = svc.CreateRoom("r1", "General")
+	_, _ = svc.CreateRoom("r2", "Soporte")
+
+	rooms, err := svc.ListRooms()
+	if err != nil {
+		t.Fatalf("ListRooms no debería fallar: %v", err)
+	}
+	if len(rooms) != 2 {
+		t.Fatalf("se esperaban 2 salas, hay %d", len(rooms))
 	}
 }

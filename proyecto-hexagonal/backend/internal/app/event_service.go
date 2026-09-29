@@ -91,3 +91,11 @@ func (s *eventService) History(roomID string) ([]domain.Event, error) {
 	}
 	return s.events.ListByRoom(roomID)
 }
+
+func (s *eventService) ListRooms() ([]domain.Room, error) {
+	rooms, err := s.rooms.List()
+	if err != nil {
+		return nil, fmt.Errorf("app: no se pudieron listar las salas: %w", err)
+	}
+	return rooms, nil
+}

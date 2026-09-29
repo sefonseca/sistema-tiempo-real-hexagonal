@@ -3,7 +3,11 @@
 // gorilla/websocket ni un cliente de Redis: eso lo saben los adaptadores.
 package ports
 
-import "contexto-hexagonal/internal/domain"
+import (
+	"context"
+
+	"contexto-hexagonal/internal/domain"
+)
 
 // ---------- Puerto de entrada (driving port) ----------
 // Lo IMPLEMENTA el dominio (application service) y lo INVOCAN los
@@ -20,6 +24,9 @@ type EventService interface {
 
 	// History devuelve el histórico de eventos de una sala.
 	History(roomID string) ([]domain.Event, error)
+
+	// ListRooms devuelve las salas existentes, las más recientes primero.
+	ListRooms() ([]domain.Room, error)
 }
 
 // ---------- Puertos de salida (driven ports) ----------
@@ -30,6 +37,7 @@ type EventService interface {
 type RoomRepository interface {
 	Save(r domain.Room) error
 	FindByID(id string) (domain.Room, bool, error)
+	List() ([]domain.Room, error)
 }
 
 // EventRepository persiste y consulta el histórico de eventos.
@@ -42,4 +50,11 @@ type EventRepository interface {
 // conectados de una sala (en producción, implementado sobre Redis Pub/Sub).
 type EventBroadcaster interface {
 	Broadcast(roomID string, e domain.Event) error
+}
+
+// EventSubscriber entrega, como un canal de Go, los eventos difundidos por
+// cualquier instancia del backend. Lo consume el adaptador de entrada
+// (Hub de WebSocket) para reenviarlos a sus clientes conectados.
+type EventSubscriber interface {
+	Subscribe(ctx context.Context) (<-chan domain.Event, error)
 }

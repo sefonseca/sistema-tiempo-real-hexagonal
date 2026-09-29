@@ -1,0 +1,14 @@
+# Go
+backend/bin/
+*.test
+*.out
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+# Entorno
+.env
+.vscode/
+.idea/
+.DS_Store
+*.tsbuildinfo
+dump.rdb
