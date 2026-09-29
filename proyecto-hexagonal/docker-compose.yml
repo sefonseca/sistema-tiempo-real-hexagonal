@@ -1,1 +1,41 @@
+# Levanta todo el sistema: Redis + Backend (Go) + Frontend (React/nginx)
+#   docker compose up --build
+# Frontend: http://localhost:5173   Backend: http://localhost:8080/healthz
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]   # persistencia AOF
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
 
+  backend:
+    build: ./backend
+    environment:
+      PORT: "8080"
+      REDIS_ADDR: redis:6379
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_WS_URL: ws://localhost:8080/ws
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  redis-data:
