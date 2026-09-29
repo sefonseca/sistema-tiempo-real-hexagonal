@@ -259,43 +259,43 @@ El sistema se modeló con HLD y C4 Model. Todos los diagramas obligatorios está
 
 ### **4.1 Diagrama de Alto Nivel (HLD)**
 
-![Diagrama de Alto Nivel][image1]
+![Diagrama de Alto Nivel](./diagramas/hld.png)
 
 El usuario accede al cliente web (capa de presentación), que se comunica con el backend en Go (capa de negocio) mediante WebSocket. El backend delega la persistencia y la difusión de eventos a Redis (capa de datos). Cada color identifica una capa y cada flecha indica el protocolo y el sentido de la comunicación.
 
 ### **4.2 Diagrama de Contexto — C4 Nivel 1**
 
-![Diagrama de Contexto C4 Nivel 1][image2]
+![Diagrama de Contexto C4 Nivel 1](./diagramas/c4-contexto.png)
 
 El sistema se modela como una única caja \[Software System\] que interactúa con personas \[Person\]. Siguiendo la norma de C4, este nivel no muestra tecnología: Go, Redis y la arquitectura interna aparecen en los niveles 2 y 3\.
 
 ### **4.3 Diagrama de Contenedores — C4 Nivel 2**
 
-![Diagrama de Contenedores C4 Nivel 2][image3]
+![Diagrama de Contenedores C4 Nivel 2](./diagramas/c4-contenedores.png)
 
 El sistema se descompone en cuatro contenedores: el servidor web (nginx) que entrega los archivos estáticos, la aplicación web (React), el backend API (Go) y Redis. Cada relación indica su protocolo entre corchetes.
 
 ### **4.4 Diagrama de Componentes — C4 Nivel 3 (Arquitectura Hexagonal)**
 
-![Diagrama de Componentes C4 Nivel 3][image4]
+![Diagrama de Componentes C4 Nivel 3](./diagramas/c4-componentes.png)
 
 La Arquitectura Hexagonal se modela en el Nivel 3, que es el nivel normativo de C4 para este estilo. El contenedor Backend API se divide en adaptadores de entrada (WebSocket Handler, Hub), núcleo (EventService y puertos de salida) y adaptadores de salida (Redis Store, Redis PubSub). Las flechas naranjas apuntan hacia el puerto: la infraestructura depende del dominio, nunca al revés.
 
 ### **4.5 Diagrama Dinámico (flujo principal)**
 
-![Diagrama Dinámico][image5]
+![Diagrama Dinámico](./diagramas/c4-dinamico.png)
 
 Flujo principal: publicar un evento. El usuario envía el mensaje, el backend valida y guarda el evento en Redis, lo publica por Pub/Sub, y el Hub lo reenvía por WebSocket a todos los clientes de la sala, incluido el autor.
 
 ### **4.6 Diagrama de Despliegue**
 
-![Diagrama de Despliegue][image6]
+![Diagrama de Despliegue](./diagramas/c4-despliegue.png)
 
 Tres contenedores en una red de Docker Compose: frontend (nginx, puerto publicado 5173), backend (puerto publicado 8080\) y redis (puerto interno 6379, con volumen redis-data para persistir). El navegador carga la SPA por HTTP y abre el WebSocket directamente contra el backend.
 
 ### **4.7 Modelo de datos**
 
-![Modelo de datos][image7]
+![Modelo de datos](./diagramas/modelo-datos.png)
 
 Tres entidades interrelacionadas: Room (1) — (N) Participant y Room (1) — (N) Event. Room y Event se persisten en Redis; Participant es efímero y vive solo en la memoria del Hub. Como Redis no tiene integridad referencial, el servicio de aplicación verifica que la sala exista antes de aceptar un evento.
 
